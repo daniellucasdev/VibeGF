@@ -38,6 +38,8 @@ Clique no cabelo da Hana para fazer carinho na cabeça ♡. O botão 📒 no hea
 
 ## Decisões
 
+- **Chave da API e workspaces:** a chamada real exige uma chave scoped a um workspace no console.anthropic.com (a API pede `anthropic-workspace-id` para chaves não-scoped). Com uma chave comum, tudo funciona; com uma chave de org multi-workspace, crie a chave já selecionando o workspace.
+
 - **ASCII — espaços sem cor:** a máscara de cores (seção 7.3) é calculada para todo caractere, mas na renderização os espaços em branco viram texto puro, sem `<span>`. Assim o ahoge (linhas 0–1) balança só o fio de cabelo, e o clique de "carinho na cabeça" só dispara sobre o cabelo desenhado.
 - **ASCII — ahoge:** cada trecho do ahoge é um `inline-block` que gira ±6° com `transform-origin` na base.
 - **Tema na fase 1:** o tema é automático pelo horário (noite das 19h às 6h). O seletor dia/noite está provisoriamente no DebugPanel, para conferir a galeria nos dois temas; o ajuste definitivo entra nos Ajustes (fase 7).

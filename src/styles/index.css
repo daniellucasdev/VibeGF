@@ -708,3 +708,111 @@
   .stat-float { animation-name: stat-fade; }
   .squish:active { transform: none; }
 }
+
+/* ───────── Toasts (9.4) ───────── */
+
+.toast-stage {
+  position: relative;
+  display: flex; align-items: center; gap: .9rem;
+  padding: 1rem 2.2rem;
+  border: 2px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+}
+.toast-sparkle {
+  position: absolute; top: 12%;
+  font-size: 1rem; color: var(--butter, #FFE58F);
+  animation: toast-sparkle 1.8s ease-in-out infinite;
+}
+@keyframes toast-sparkle {
+  0%, 100% { opacity: .25; transform: scale(.8); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+.toast-milestone {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .45rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: .85rem;
+  color: var(--ink);
+}
+
+/* ───────── ConfessionScene (9.5) ───────── */
+
+.confession-scene {
+  background:
+    linear-gradient(180deg, #4A3B6B 0%, #8A5A8F 45%, #E8917F 75%, #FFC1A6 100%);
+}
+.confession-dialog {
+  border: 2px solid rgb(255 255 255 / .35);
+  border-radius: 22px;
+  background: rgb(30 20 45 / .55);
+  backdrop-filter: blur(8px);
+  padding: 1.1rem 1.4rem;
+  color: #fff;
+}
+.confession-btn {
+  padding: .45rem 1.2rem;
+  border: 2px solid rgb(255 255 255 / .5);
+  border-radius: 999px;
+  background: rgb(255 255 255 / .14);
+  color: #fff;
+  cursor: pointer;
+  font-size: .95rem;
+  transition: background 150ms ease, transform 120ms ease;
+}
+.confession-btn:hover { background: rgb(255 255 255 / .26); }
+.confession-btn:active { transform: scale(.96); }
+.confession-btn-love {
+  border-color: #FF9CCB;
+  background: rgb(255 126 182 / .35);
+}
+.caret {
+  display: inline-block;
+  margin-left: 2px;
+  color: #FF9CCB;
+  animation: caret-blink 1s steps(1) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+.petal-fall {
+  position: absolute; top: -8%;
+  font-size: 1.1rem;
+  animation: petal-fall linear infinite;
+}
+@keyframes petal-fall {
+  0% { transform: translateY(-4vh) rotate(0deg); opacity: 0; }
+  8% { opacity: .9; }
+  100% { transform: translateY(108vh) rotate(360deg); opacity: .5; }
+}
+
+/* ───────── Álbum (8.3) ───────── */
+
+.album-polaroid {
+  display: flex; flex-direction: column;
+  padding: .7rem .7rem .8rem;
+  background: #FFF9F2;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgb(232 88 155 / .14);
+  color: var(--ink);
+}
+
+/* ───────── Corações de progresso (8.3) ───────── */
+
+.heart-full { color: var(--pink-strong); }
+.heart-empty { color: var(--ink-soft); }
+.heart-full:nth-child(1) { animation: heart-beat 2.2s ease-in-out infinite; }
+@keyframes heart-beat {
+  0%, 100% { transform: scale(1); }
+  12% { transform: scale(1.18); }
+  24% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-sparkle, .petal-fall, .caret, .heart-full { animation: none; }
+  .toast-stage, .toast-milestone { transition: none; }
+}

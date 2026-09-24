@@ -4,9 +4,11 @@ import { useShallow } from "zustand/react/shallow";
 import { AsciiGirl } from "../ascii/AsciiGirl";
 import { EMOTION_LIST, EXPRESSIONS, EXPRESSION_META, type Emotion } from "../ascii/expressions";
 import { chatEngine } from "../chat/instance";
+import { clockState, resetClock, setFixedClock, travel } from "../game/time";
 import type { Settings, ThemeChoice } from "../store/save";
 import { chatUiStore, useChatUi, type DebugStage } from "../store/useChatUi";
 import { gameStore, useGame } from "../store/useGame";
+import { toasts } from "./Toasts";
 
 type DebugPanelProps = { onClose: () => void };
 
@@ -34,6 +36,7 @@ export function DebugPanel({ onClose }: DebugPanelProps) {
   const debug = useChatUi((s) => s.debug);
   const lastResponse = useChatUi((s) => s.lastResponse);
   const settings = useGame(useShallow((s) => s.settings));
+  const relationship = useGame((s) => s.relationship);
   const galleryIntensity = debug.intensity ?? 0.5;
 
   const restart = () => {
@@ -116,6 +119,92 @@ export function DebugPanel({ onClose }: DebugPanelProps) {
               )}
               <Toggle label="falar" checked={debug.talking} onChange={(b) => setStage({ talking: b })} />
               <Toggle label="olhar pro chat" checked={debug.lookAtChat} onChange={(b) => setStage({ lookAtChat: b })} />
+            </div>
+          </fieldset>
+
+          <fieldset className="space-y-3">
+            <legend className="mb-2 font-display text-pink-strong">Relação ⏱ (viagem no tempo)</legend>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" className="squish rounded-full border-2 border-border bg-surface-2 px-3 py-1 text-sm" onClick={() => travel(3600_000)}>
+                +1 h
+              </button>
+              <button type="button" className="squish rounded-full border-2 border-border bg-surface-2 px-3 py-1 text-sm" onClick={() => travel(24 * 3600_000)}>
+                +1 dia
+              </button>
+              <button type="button" className="squish rounded-full border-2 border-border bg-surface-2 px-3 py-1 text-sm" onClick={() => setFixedClock(new Date())}>
+                ⏸ relógio fixo
+              </button>
+              <button type="button" className="squish rounded-full border-2 border-border bg-surface-2 px-3 py-1 text-sm" onClick={resetClock}>
+                ▶ relógio real
+              </button>
+              <span className="font-mono text-xs text-ink-soft">
+                {clockState().fixed ? `fixo em ${clockState().fixed!.toLocaleString("pt-BR")}` : `offset: ${Math.round(clockState().offsetMs / 60000)} min`}
+              </span>
+            </div>
+          </fieldset>
+
+          <fieldset className="space-y-3">
+            <legend className="mb-2 font-display text-pink-strong">Sentimentos e estágio 💗</legend>
+            <div className="flex flex-wrap items-center gap-4">
+              {(["affection", "trust", "romance"] as const).map((k) => (
+                <label key={k} className="inline-flex items-center gap-2 text-sm">
+                  {k}
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={relationship[k]}
+                    onChange={(e) => gameStore.setState({ relationship: { ...relationship, [k]: Number(e.target.value) } })}
+                    className="accent-pink-strong"
+                  />
+                  <span className="w-8 font-mono text-xs">{relationship[k]}</span>
+                </label>
+              ))}
+              <label className="inline-flex items-center gap-2 text-sm">
+                estágio
+                <select
+                  className="rounded-full border-2 border-border bg-surface-2 px-3 py-1"
+                  value={relationship.stage}
+                  onChange={(e) => gameStore.setState({ relationship: { ...relationship, stage: Number(e.target.value) as 0 | 1 | 2 | 3 | 4 | 5 } })}
+                >
+                  {[0, 1, 2, 3, 4, 5].map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm">
+                declaração
+                <select
+                  className="rounded-full border-2 border-border bg-surface-2 px-3 py-1"
+                  value={relationship.confession.state}
+                  onChange={(e) =>
+                    gameStore.setState({
+                      relationship: {
+                        ...relationship,
+                        confession: { ...relationship.confession, state: e.target.value as typeof relationship.confession.state },
+                      },
+                    })
+                  }
+                >
+                  {["locked", "open", "she_confessed", "cooldown", "together"].map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="squish rounded-full border-2 border-border bg-surface-2 px-3 py-1 text-sm"
+                onClick={() => chatUiStore.setState({ confession: { quote: "eu gosto de você… gosto de verdade.", key: Date.now() } })}
+              >
+                ♡ forçar cena de declaração
+              </button>
+              <button
+                type="button"
+                className="squish rounded-full border-2 border-border bg-surface-2 px-3 py-1 text-sm"
+                onClick={() => toasts.stageUp("🌷", "🌷 Vocês agora são amigos!")}
+              >
+                ✨ forçar toast
+              </button>
             </div>
           </fieldset>
 

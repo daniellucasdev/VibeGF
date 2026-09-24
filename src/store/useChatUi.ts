@@ -27,6 +27,8 @@ export type ChatUiState = {
   /** Variação do último turno, para o "+2" flutuante das barras. */
   lastDeltas: { key: number; applied: Deltas } | null;
   lastResponse: ChatResponse | null;
+  /** Abre a ConfessionScene (9.5) com a fala final do turno aceito. */
+  confession: { quote: string; key: number } | null;
   debug: DebugStage;
 };
 
@@ -39,6 +41,7 @@ export const initialChatUi = (): ChatUiState => ({
   composing: false,
   lastDeltas: null,
   lastResponse: null,
+  confession: null,
   debug: { emotion: null, intensity: null, talking: false, lookAtChat: false },
 });
 

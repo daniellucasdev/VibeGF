@@ -6,11 +6,11 @@ type AppShellProps = {
   character: ReactNode;
   chat: ReactNode;
   onOpenMemories: () => void;
+  onOpenAlbum: () => void;
 };
 
-// Álbum, ajustes e som ganham função nas próximas fases.
+// Ajustes e som ganham função na fase 7.
 const SOON = [
-  { icon: "📸", label: "álbum" },
   { icon: "⚙️", label: "ajustes" },
   { icon: "🔊", label: "som" },
 ] as const;
@@ -29,7 +29,7 @@ export function Logo() {
 }
 
 /** Estrutura geral: fundo, header com logo e duas colunas (Hana à esquerda, chat à direita). */
-export function AppShell({ theme, character, chat, onOpenMemories }: AppShellProps) {
+export function AppShell({ theme, character, chat, onOpenMemories, onOpenAlbum }: AppShellProps) {
   return (
     <div className="flex min-h-dvh flex-col min-[900px]:h-dvh">
       <BackgroundScene theme={theme} />
@@ -38,6 +38,9 @@ export function AppShell({ theme, character, chat, onOpenMemories }: AppShellPro
         <nav className="flex gap-1.5 min-[900px]:gap-2" aria-label="menu">
           <button type="button" aria-label="memórias" title="O que a Hana lembra de você ✎" onClick={onOpenMemories} className={HEADER_BTN}>
             <span aria-hidden="true">📒</span>
+          </button>
+          <button type="button" aria-label="álbum" title="Os momentos de vocês dois 📸" onClick={onOpenAlbum} className={HEADER_BTN}>
+            <span aria-hidden="true">📸</span>
           </button>
           {SOON.map((b) => (
             <button

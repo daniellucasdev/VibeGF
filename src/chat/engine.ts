@@ -2,13 +2,17 @@
 // balões em sequência, cena de abertura roteirizada e resumo (5.6).
 // Os tempos usam o relógio real (setTimeout); as datas das mensagens e a lógica do jogo
 // usam o now() central, para a viagem no tempo do debug valer em tudo.
-import type { ChatRequest, ChatResponse, HanaTurn, SummarizeRequest, SummarizeResponse } from "../../shared/types";
-import { now as clockNow } from "../game/time";
+import type { ChatRequest, ChatResponse, HanaEvent, HanaTurn, SummarizeRequest, SummarizeResponse } from "../../shared/types";
+import { STAGES } from "../../shared/stages";
+import type { TurnResult } from "../game/relationship";
+import { HOUR, now as clockNow } from "../game/time";
 import { errorMessage } from "../lib/api";
 import { cutChars } from "../lib/text";
 import { USER_MESSAGE_MAX_CHARS } from "../store/save";
 import { initialChatUi, type ChatUiState, type ChatUiStore } from "../store/useChatUi";
 import type { GameStore } from "../store/useGame";
+import { toasts } from "../components/Toasts";
+import { pop } from "../lib/sound";
 import { OPENING_CAPTION, OPENING_CAPTION_MS, OPENING_LINES, OPENING_UNDIM_MS } from "./opening";
 import { browserTimeZone, buildChatRequest, displayMood, summarizeBatch, toHistoryItem, unansweredUserIds } from "./request";
 import { DEBOUNCE_MS, balloonGapMs, readDelayMs, talkTailMs, typingDelayMs } from "./timing";
@@ -28,7 +32,7 @@ export type EngineDeps = {
 };
 
 export type ChatEngine = {
-  /** Na carga do app: toca a abertura pendente ou responde o que ficou sem resposta. */
+  /** Na carga do app: abertura pendente, retorno após ausência ou o que ficou sem resposta. */
   boot: () => void;
   send: (text: string) => void;
   /** Botão "tentar de novo" do ErrorBubble. */
@@ -38,9 +42,16 @@ export type ChatEngine = {
   reset: () => void;
   /** Mostra na hora os balões que faltam (a página vai fechar). */
   flushDelivery: () => void;
+  /** Silêncio (5.5): ela manda UMA mensagem se o usuário sumir com a aba visível. */
+  pokeIdle: () => void;
 };
 
 type Balloon = { text: string; thought: string | null; pauseBeforeMs?: number };
+
+/** Retorno (9.3): última interação há mais de 6 h na carga → greet_return. */
+export const RETURN_GAP_MS = 6 * HOUR;
+/** Silêncio (5.5): 5 min em silêncio com a aba visível → idle_nudge (uma vez). */
+export const IDLE_NUDGE_MS = 5 * 60_000;
 
 type Outcome = { ok: true; res: ChatResponse } | { ok: false; error: unknown };
 
@@ -69,6 +80,8 @@ export function createChatEngine(deps: EngineDeps): ChatEngine {
   let debounce: ReturnType<typeof setTimeout> | undefined;
   let lastSendAt = 0;
   let flushRest: (() => void) | null = null;
+  /** Silêncio atual já respondeu (5.5): uma mensagem por silêncio, no máximo. */
+  let nudged = false;
 
   const g = () => game.getState();
   const setUi = (patch: Partial<ChatUiState>) => ui.setState(patch);
@@ -85,6 +98,7 @@ export function createChatEngine(deps: EngineDeps): ChatEngine {
   function send(raw: string) {
     const text = cutChars(raw.trim(), USER_MESSAGE_MAX_CHARS);
     if (!text || opening || !g().profile) return;
+    armIdle(); // o usuário voltou a interagir: o próximo silêncio pode ter mensagem dela
     const id = g().appendMessage({ role: "user", text, at: now().toISOString(), status: "sent", reaction: null });
     pending.push(id);
     lastSendAt = Date.now();
@@ -161,10 +175,35 @@ export function createChatEngine(deps: EngineDeps): ChatEngine {
       // applyTurn + memórias + reação + marcos, junto com o primeiro balão
       const result = g().commitTurn({ turn, userIds: ids, now: now() });
       ui.setState((s) => ({ lastDeltas: { key: (s.lastDeltas?.key ?? 0) + 1, applied: result.applied } }));
+      announceResult(result, turn);
     };
     const last = turn.messages.length - 1;
     const balloons: Balloon[] = turn.messages.map((text, i) => ({ text, thought: i === last && turn.thought ? turn.thought : null }));
     await deliver(balloons, { alive, typingSince, before: commit });
+  }
+
+  /** Toasts + som depois do turno aplicado (9.4): subida de estágio, marcos, declaração. */
+  function announceResult(result: TurnResult, turn: HanaTurn) {
+    const s = g();
+    if (s.settings.sound) pop();
+    if (result.stageUp !== null) {
+      const info = STAGES[result.stageUp];
+      toasts.stageUp(info.icon, info.toast);
+    }
+    if (result.confessionScene) {
+      ui.setState({ confession: { quote: turn.messages[0] ?? "", key: Date.now() } });
+    }
+    const MILESTONE_TOASTS: Partial<Record<HanaEvent, string>> = {
+      first_name_basis: "ela te chamou só pelo nome pela primeira vez",
+      nickname: "vocês combinaram um apelido ♡",
+      inside_joke: "nasceu uma piada interna 😂",
+      date_invite: "vocês combinaram de sair 📅",
+      fight: "vocês brigaram… tenta conversar com ela",
+      made_up: "pazes feitas 🕊",
+      she_confessed: "ela acabou de se declarar!! (〃▽〃)",
+    };
+    const text = MILESTONE_TOASTS[result.event];
+    if (text) toasts.milestone("💬", text);
   }
 
   /**
@@ -274,7 +313,57 @@ export function createChatEngine(deps: EngineDeps): ChatEngine {
       pending = ids;
       lastSendAt = Date.now();
       schedule(DEBOUNCE_MS);
+      return;
     }
+    // Retorno após ausência (9.3): última interação há mais de 6 h → ela puxa assunto, uma vez por carga.
+    const last = s.lastInteractionAt ? new Date(s.lastInteractionAt).getTime() : null;
+    if (last !== null && now().getTime() - last > RETURN_GAP_MS && s.messages.some((m) => m.role === "hana")) {
+      void proactiveTurn("greet_return");
+    }
+  }
+
+  /** Turno sem mensagem do usuário (greet_return / idle_nudge): sem deltas visíveis, sem anti-grind. */
+  async function proactiveTurn(mode: "greet_return" | "idle_nudge") {
+    if (busy || opening || pending.length) return;
+    const myGen = gen;
+    const alive = () => myGen === gen;
+    busy = true;
+    setUi({ typing: true, error: null });
+    const typingSince = Date.now();
+    try {
+      const req = buildChatRequest(g(), mode, now(), timeZone());
+      const res = await api.chat(req);
+      if (!alive()) return;
+      // Decisão da fase 2: turno sem mensagem do usuário não rende sentimento
+      // nem memória nova (o usuário não contou nada). Eventos valem: ela pode
+      // se declarar num retorno ou no silêncio.
+      const turn: HanaTurn = { ...res, deltas: { affection: 0, trust: 0, romance: 0 }, newMemories: [] };
+      setUi({ lastResponse: res });
+      await deliverTurn(turn, [], typingSince, alive);
+    } catch (error) {
+      if (!alive()) return;
+      // Silencioso: um retorno que falhou não vira balão de erro na cara do usuário.
+      console.warn("[kokoro] turno proativo falhou", error);
+    } finally {
+      if (alive()) busy = false;
+    }
+  }
+
+  /** Silêncio (5.5): chamado pelo timer da UI; no máximo uma vez por silêncio. */
+  function pokeIdle() {
+    if (nudged) return;
+    const s = g();
+    if (!s.settings.idleNudge || s.relationship.stage < 2) return;
+    const msgs = s.messages;
+    const last = msgs[msgs.length - 1];
+    if (!last || last.role !== "hana") return;
+    nudged = true;
+    void proactiveTurn("idle_nudge");
+  }
+
+  /** O usuário voltou a interagir: o próximo silêncio pode ter uma mensagem again. */
+  function armIdle() {
+    nudged = false;
   }
 
   function reset() {
@@ -293,5 +382,5 @@ export function createChatEngine(deps: EngineDeps): ChatEngine {
     flushRest?.();
   }
 
-  return { boot, send, retry, playOpening, reset, flushDelivery };
+  return { boot, send, retry, playOpening, reset, flushDelivery, pokeIdle };
 }
