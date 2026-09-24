@@ -5,17 +5,20 @@ type AppShellProps = {
   theme: "day" | "night";
   character: ReactNode;
   chat: ReactNode;
+  onOpenMemories: () => void;
 };
 
-// Os botões do header ganham função nas próximas fases (memórias, álbum, ajustes, som).
-const HEADER_BUTTONS = [
-  { icon: "📒", label: "memórias" },
+// Álbum, ajustes e som ganham função nas próximas fases.
+const SOON = [
   { icon: "📸", label: "álbum" },
   { icon: "⚙️", label: "ajustes" },
   { icon: "🔊", label: "som" },
 ] as const;
 
-function Logo() {
+const HEADER_BTN =
+  "squish grid size-9 place-items-center rounded-full border-2 border-border bg-surface-2 text-base shadow-kawaii min-[900px]:size-11 min-[900px]:text-lg";
+
+export function Logo() {
   return (
     <h1 className="relative select-none text-2xl min-[900px]:text-3xl">
       <span className="kokoro-logo">Kokoro ♡</span>
@@ -26,21 +29,24 @@ function Logo() {
 }
 
 /** Estrutura geral: fundo, header com logo e duas colunas (Hana à esquerda, chat à direita). */
-export function AppShell({ theme, character, chat }: AppShellProps) {
+export function AppShell({ theme, character, chat, onOpenMemories }: AppShellProps) {
   return (
     <div className="flex min-h-dvh flex-col min-[900px]:h-dvh">
       <BackgroundScene theme={theme} />
       <header className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-3 px-4 py-2 min-[900px]:py-3">
         <Logo />
         <nav className="flex gap-1.5 min-[900px]:gap-2" aria-label="menu">
-          {HEADER_BUTTONS.map((b) => (
+          <button type="button" aria-label="memórias" title="O que a Hana lembra de você ✎" onClick={onOpenMemories} className={HEADER_BTN}>
+            <span aria-hidden="true">📒</span>
+          </button>
+          {SOON.map((b) => (
             <button
               key={b.label}
               type="button"
               aria-label={b.label}
               aria-disabled="true"
               title={`${b.label} (em breve ✿)`}
-              className="squish grid size-9 place-items-center rounded-full border-2 border-border bg-surface-2 text-base shadow-kawaii min-[900px]:size-11 min-[900px]:text-lg"
+              className={HEADER_BTN}
             >
               <span aria-hidden="true">{b.icon}</span>
             </button>

@@ -1,23 +1,14 @@
 import { useState } from "react";
 import { motion } from "motion/react";
+import { useShallow } from "zustand/react/shallow";
 import { AsciiGirl } from "../ascii/AsciiGirl";
 import { EMOTION_LIST, EXPRESSIONS, EXPRESSION_META, type Emotion } from "../ascii/expressions";
+import { chatEngine } from "../chat/instance";
+import type { Settings, ThemeChoice } from "../store/save";
+import { chatUiStore, useChatUi, type DebugStage } from "../store/useChatUi";
+import { gameStore, useGame } from "../store/useGame";
 
-export type ThemeChoice = "auto" | "day" | "night";
-
-type DebugPanelProps = {
-  onClose: () => void;
-  emotion: Emotion;
-  setEmotion: (e: Emotion) => void;
-  intensity: number;
-  setIntensity: (n: number) => void;
-  talking: boolean;
-  setTalking: (b: boolean) => void;
-  lookAtChat: boolean;
-  setLookAtChat: (b: boolean) => void;
-  theme: ThemeChoice;
-  setTheme: (t: ThemeChoice) => void;
-};
+type DebugPanelProps = { onClose: () => void };
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (b: boolean) => void }) {
   return (
@@ -28,12 +19,29 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-/** Painel de debug (?debug=1 ou Ctrl+Shift+D). Nesta fase: palco da Hana, tema e galeria de expressões. */
-export function DebugPanel(props: DebugPanelProps) {
+const setStage = (patch: Partial<DebugStage>) => chatUiStore.setState((s) => ({ debug: { ...s.debug, ...patch } }));
+const setSetting = (patch: Partial<Settings>) => gameStore.getState().updateSettings(patch);
+
+/**
+ * Painel de debug (?debug=1 ou Ctrl+Shift+D): palco da Hana, galeria de expressões,
+ * ajustes provisórios (até a janela de ajustes da fase 7), último turno e recomeçar.
+ */
+export function DebugPanel({ onClose }: DebugPanelProps) {
   const [galleryTalking, setGalleryTalking] = useState(false);
   const [galleryBlink, setGalleryBlink] = useState(false);
   const [galleryLook, setGalleryLook] = useState(false);
   const [galleryParticles, setGalleryParticles] = useState(true);
+  const debug = useChatUi((s) => s.debug);
+  const lastResponse = useChatUi((s) => s.lastResponse);
+  const settings = useGame(useShallow((s) => s.settings));
+  const galleryIntensity = debug.intensity ?? 0.5;
+
+  const restart = () => {
+    if (!window.confirm("Apagar o save e voltar para o onboarding?")) return;
+    chatEngine.reset();
+    gameStore.getState().resetAll();
+    onClose();
+  };
 
   return (
     <motion.div
@@ -43,7 +51,7 @@ export function DebugPanel(props: DebugPanelProps) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
+        if (e.target === e.currentTarget) onClose();
       }}
     >
       <motion.section
@@ -60,7 +68,7 @@ export function DebugPanel(props: DebugPanelProps) {
           <h2 className="font-normal">⚙ debug.exe</h2>
           <button
             type="button"
-            onClick={props.onClose}
+            onClick={onClose}
             aria-label="fechar debug"
             className="squish grid size-7 place-items-center rounded-full border-2 border-border bg-surface-2 text-xs text-pink-strong"
           >
@@ -76,9 +84,10 @@ export function DebugPanel(props: DebugPanelProps) {
                 emoção
                 <select
                   className="rounded-full border-2 border-border bg-surface-2 px-3 py-1"
-                  value={props.emotion}
-                  onChange={(e) => props.setEmotion(e.target.value as Emotion)}
+                  value={debug.emotion ?? ""}
+                  onChange={(e) => setStage({ emotion: e.target.value ? (e.target.value as Emotion) : null })}
                 >
+                  <option value="">(humor real)</option>
                   {EMOTION_LIST.map((e) => (
                     <option key={e} value={e}>
                       {EXPRESSION_META[e].kaomoji} {EXPRESSION_META[e].label}
@@ -86,33 +95,66 @@ export function DebugPanel(props: DebugPanelProps) {
                   ))}
                 </select>
               </label>
-              <label className="inline-flex items-center gap-2 text-sm">
-                intensidade {props.intensity.toFixed(2)}
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={props.intensity}
-                  onChange={(e) => props.setIntensity(Number(e.target.value))}
-                  className="accent-pink-strong"
-                />
-              </label>
-              <Toggle label="falar" checked={props.talking} onChange={props.setTalking} />
-              <Toggle label="olhar pro chat" checked={props.lookAtChat} onChange={props.setLookAtChat} />
+              <Toggle
+                label="forçar intensidade"
+                checked={debug.intensity !== null}
+                onChange={(b) => setStage({ intensity: b ? 0.5 : null })}
+              />
+              {debug.intensity !== null && (
+                <label className="inline-flex items-center gap-2 text-sm">
+                  {debug.intensity.toFixed(2)}
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={debug.intensity}
+                    onChange={(e) => setStage({ intensity: Number(e.target.value) })}
+                    className="accent-pink-strong"
+                  />
+                </label>
+              )}
+              <Toggle label="falar" checked={debug.talking} onChange={(b) => setStage({ talking: b })} />
+              <Toggle label="olhar pro chat" checked={debug.lookAtChat} onChange={(b) => setStage({ lookAtChat: b })} />
+            </div>
+          </fieldset>
+
+          <fieldset className="space-y-3">
+            <legend className="mb-2 font-display text-pink-strong">Ajustes provisórios ♡</legend>
+            <div className="flex flex-wrap items-center gap-3">
               <label className="inline-flex items-center gap-2 text-sm">
                 tema
                 <select
                   className="rounded-full border-2 border-border bg-surface-2 px-3 py-1"
-                  value={props.theme}
-                  onChange={(e) => props.setTheme(e.target.value as ThemeChoice)}
+                  value={settings.theme}
+                  onChange={(e) => setSetting({ theme: e.target.value as ThemeChoice })}
                 >
                   <option value="auto">auto</option>
                   <option value="day">dia ☀</option>
                   <option value="night">noite ☾</option>
                 </select>
               </label>
+              <Toggle label="ler pensamentos 💭" checked={settings.readThoughts} onChange={(b) => setSetting({ readThoughts: b })} />
+              <Toggle label="mostrar números" checked={settings.showNumbers} onChange={(b) => setSetting({ showNumbers: b })} />
+              <button
+                type="button"
+                onClick={restart}
+                className="squish rounded-full border-2 border-border bg-surface-2 px-3 py-1 text-sm"
+              >
+                ↺ recomeçar do zero
+              </button>
             </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 font-display text-pink-strong">Último turno ✉</legend>
+            {lastResponse ? (
+              <pre className="max-h-64 overflow-auto rounded-[14px] border-2 border-border bg-surface-2 p-3 font-mono text-xs">
+                {JSON.stringify(lastResponse, null, 2)}
+              </pre>
+            ) : (
+              <p className="text-sm text-ink-muted">nenhuma resposta ainda nesta sessão.</p>
+            )}
           </fieldset>
 
           <fieldset>
@@ -130,16 +172,16 @@ export function DebugPanel(props: DebugPanelProps) {
                   <li key={e}>
                     <button
                       type="button"
-                      onClick={() => props.setEmotion(e)}
-                      aria-pressed={props.emotion === e}
+                      onClick={() => setStage({ emotion: e })}
+                      aria-pressed={debug.emotion === e}
                       aria-label={`usar ${meta.label} no palco`}
                       className={`squish flex w-full flex-col items-center gap-1 rounded-[18px] border-2 bg-surface-2 px-2 pb-2 pt-5 ${
-                        props.emotion === e ? "border-pink-strong" : "border-border"
+                        debug.emotion === e ? "border-pink-strong" : "border-border"
                       }`}
                     >
                       <AsciiGirl
                         emotion={e}
-                        intensity={props.intensity}
+                        intensity={galleryIntensity}
                         talking={galleryTalking}
                         forceBlink={galleryBlink}
                         lookAtChat={galleryLook}

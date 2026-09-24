@@ -27,7 +27,14 @@ Abra o Claude Code nesta pasta e digite algo como "Leia o PROMPT.md e implemente
 
 ## Debug
 
-Abra com `?debug=1` na URL ou `Ctrl+Shift+D`. Por enquanto o painel tem o "palco" (emoção, intensidade, falar, olhar pro chat e tema dia/noite) e a galeria com as 13 expressões lado a lado, com opções de falar, piscar, olhar pro chat e partículas. Clique no cabelo da Hana para fazer carinho na cabeça ♡.
+Abra com `?debug=1` na URL ou `Ctrl+Shift+D`. O painel tem:
+
+- **Palco:** força uma emoção, a intensidade, a boca falando e o olhar pro chat por cima do humor real ("(humor real)" devolve o controle para o jogo).
+- **Ajustes provisórios:** tema (auto/dia/noite), "ler pensamentos 💭", "mostrar números" e "↺ recomeçar do zero" (apaga o save e volta ao onboarding). Esses ajustes vão para a janela ⚙️ na fase 7.
+- **Último turno:** o JSON que o servidor devolveu (com `usage` em desenvolvimento).
+- **Galeria** com as 13 expressões lado a lado, com opções de falar, piscar, olhar pro chat e partículas.
+
+Clique no cabelo da Hana para fazer carinho na cabeça ♡. O botão 📒 no header abre "O que a Hana lembra de você ✎", onde dá pra apagar cada memória.
 
 ## Decisões
 
@@ -49,6 +56,21 @@ Abra com `?debug=1` na URL ou `Ctrl+Shift+D`. Por enquanto o painel tem o "palco
 - **Humor-base:** o PROMPT.md dá a intensidade só para `pouty` (0,4) e `happy` (0,3). Usei 0,5 para `sleepy` e 0,3 para `neutral`.
 - **Dias conversados:** o save guarda `daysTalked` (as datas) e a contagem só do dia corrente.
 - **Zod:** v4 (`zod@4`). `z.number().int()` e `z.enum([...])` funcionam como no PROMPT.md.
+- **Store (fase 4):** zustand 5 com `createStore` + `persist` em `src/store/useGame.ts` (hook `useGame(selector)`), chave `kokoro-save`, `version: 1`. O que é passageiro ("digitando…", boca falando, erro, cena de abertura, "+N" das barras, último JSON) mora num segundo store sem persistência (`useChatUi.ts`), para não regravar o localStorage a cada tecla.
+- **Save validado campo a campo:** além do `migrate` (qualquer versão diferente de 1), um `merge` próprio passa o que vem do disco por schemas Zod campo a campo (`src/store/save.ts`). Um pedaço estragado vira o padrão daquele campo, sem apagar o resto; mensagens, memórias e marcos inválidos são descartados um a um. O storage do persist tem try/catch na leitura (JSON estragado → começa do zero) e na escrita (cota cheia → aviso no console).
+- **Ids:** mensagens, memórias e marcos compartilham um contador crescente (`nextId`). `summarizedUpTo` guarda o id da última mensagem resumida, não um índice, porque o teto de 400 descarta as mais antigas.
+- **Um balão = uma mensagem:** cada balão guarda a emoção daquele momento (kaomoji do avatar). O `thought` do turno fica no último balão (ThoughtCloud). O avatar aparece no primeiro balão do grupo e quando a emoção muda. "✓ enviado / ✓✓ visto" aparece na última bolha de cada grupo do usuário.
+- **Quando o turno é aplicado:** `applyTurn`, memórias, reação e marcos entram junto com o primeiro balão (é quando a expressão muda e as barras animam); os outros balões entram um a um. Se a página fechar no meio, o `pagehide` mostra na hora os balões que faltam, para o save não perdê-los. O "digitando…" do primeiro balão desconta o tempo que já ficou na tela esperando a API.
+- **Boca falando:** do primeiro balão até um pouco depois do último (`min(1500, 300 + 25 × caracteres)` ms).
+- **Erro:** nunca há nova tentativa automática. O balão de erro tem "↻ tentar de novo", e uma mensagem nova também leva junto as que falharam. Se a chamada falha antes do tempo de leitura, a mensagem fica em "✓ enviado". Mensagens do usuário que ficaram sem resposta (página fechada antes da resposta) são respondidas uma única vez na próxima carga.
+- **Cena de abertura:** a legenda "[Uma notificação de um número desconhecido…]" fica salva como mensagem `scene` no topo da conversa (o servidor a transforma em narração entre colchetes). Se a página recarregar no meio da cena, ela recomeça do zero. O primeiro balão vira o marco `first_message` do álbum.
+- **Marcos:** `first_message`, `stage_up` e os eventos aceitos pelo código já são registrados no save; os toasts, a `ConfessionScene` e o álbum entram na fase 6.
+- **"[3 horas depois]" na lista:** calculado na hora de desenhar, com a mesma regra do servidor (`sceneGapMarker`), e nunca colado numa cena salva. O `DaySeparator` usa `Intl` em pt-BR ("quinta-feira, 24 de setembro").
+- **Limites de texto:** `cutChars` corta pela mesma conta do `z.string().max()` do servidor (unidades de `.length`) sem partir emoji, para um texto cheio de emoji nunca virar erro 400. Os tempos de digitação contam caracteres de verdade (code points).
+- **Contraste:** o gradiente das bolhas do usuário foi escurecido (`#C93D82 → #7A52CC`) para o texto branco passar de 4,5:1 nas duas pontas. Texto secundário pequeno usa `--ink-muted` (`#75567B` de dia), porque `--ink-soft` sobre `--surface-2` dá 4,37:1.
+- **CSS fora de `@layer`:** `.kawaii-window` define `position: relative` fora de camada e por isso vence os utilitários do Tailwind; o `KaomojiPicker` (que precisa de `absolute`) tem estilo próprio.
+- **Bundle:** o Zod também roda no cliente (validar o save e a resposta da API), então `react`, `motion` e `zod` saem em chunks próprios e nenhum passa de 500 kB. O coração de enviar é o `Heart` do `lucide-react`.
+- **Onboarding:** o tratamento sugerido acompanha o pronome (ele → -kun, ela → -chan, elu → só o nome) até o usuário escolher um.
 
 ## Personalização
 

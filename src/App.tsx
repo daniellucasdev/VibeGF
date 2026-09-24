@@ -1,34 +1,40 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, MotionConfig } from "motion/react";
-import type { Emotion } from "./ascii/expressions";
+import type { PaceKey, Profile } from "../shared/types";
+import { chatEngine } from "./chat/instance";
 import { AppShell } from "./components/AppShell";
 import { CharacterPanel } from "./components/CharacterPanel";
 import { ChatWindow } from "./components/ChatWindow";
-import { DebugPanel, type ThemeChoice } from "./components/DebugPanel";
-
-/** Noite das 19h às 6h (seção 8.1). O ajuste de tema definitivo entra na fase 7. */
-function autoTheme(date: Date): "day" | "night" {
-  const h = date.getHours();
-  return h >= 19 || h < 6 ? "night" : "day";
-}
+import { DebugPanel } from "./components/DebugPanel";
+import { MemoriesDrawer } from "./components/MemoriesDrawer";
+import { Onboarding } from "./components/Onboarding";
+import { OpeningOverlay } from "./components/OpeningOverlay";
+import { isNightTime } from "./game/time";
+import { useNow } from "./hooks/useNow";
+import { gameStore, useGame } from "./store/useGame";
 
 function debugFromUrl(): boolean {
   return new URLSearchParams(window.location.search).get("debug") === "1";
 }
 
 export default function App() {
-  const [emotion, setEmotion] = useState<Emotion>("neutral");
-  const [intensity, setIntensity] = useState(0.5);
-  const [talking, setTalking] = useState(false);
-  const [lookAtChat, setLookAtChat] = useState(false);
-  const [themeChoice, setThemeChoice] = useState<ThemeChoice>("auto");
+  const hasProfile = useGame((s) => s.profile !== null);
+  const themeChoice = useGame((s) => s.settings.theme);
+  const clock = useNow(60_000);
   const [debugOpen, setDebugOpen] = useState(debugFromUrl);
+  const [memoriesOpen, setMemoriesOpen] = useState(false);
 
-  const theme = themeChoice === "auto" ? autoTheme(new Date()) : themeChoice;
+  // Tema automático: noite das 19h às 6h (8.1), com o relógio central.
+  const theme = themeChoice === "auto" ? (isNightTime(clock) ? "night" : "day") : themeChoice;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  // Abertura pela metade ou mensagens sem resposta: o motor resolve uma vez, na carga.
+  useEffect(() => {
+    chatEngine.boot();
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -43,31 +49,24 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const start = useCallback((profile: Profile, pace: PaceKey) => {
+    gameStore.getState().startGame(profile, pace);
+    void chatEngine.playOpening();
+  }, []);
+  const openMemories = useCallback(() => setMemoriesOpen(true), []);
+  const closeMemories = useCallback(() => setMemoriesOpen(false), []);
+  const closeDebug = useCallback(() => setDebugOpen(false), []);
+
   return (
     <MotionConfig reducedMotion="user">
-      <AppShell
-        theme={theme}
-        character={<CharacterPanel emotion={emotion} intensity={intensity} talking={talking} lookAtChat={lookAtChat} />}
-        chat={<ChatWindow />}
-      />
-      <AnimatePresence>
-        {debugOpen && (
-          <DebugPanel
-            key="debug"
-            onClose={() => setDebugOpen(false)}
-            emotion={emotion}
-            setEmotion={setEmotion}
-            intensity={intensity}
-            setIntensity={setIntensity}
-            talking={talking}
-            setTalking={setTalking}
-            lookAtChat={lookAtChat}
-            setLookAtChat={setLookAtChat}
-            theme={themeChoice}
-            setTheme={setThemeChoice}
-          />
-        )}
-      </AnimatePresence>
+      {hasProfile ? (
+        <AppShell theme={theme} onOpenMemories={openMemories} character={<CharacterPanel />} chat={<ChatWindow />} />
+      ) : (
+        <Onboarding theme={theme} onStart={start} />
+      )}
+      <OpeningOverlay />
+      <MemoriesDrawer open={memoriesOpen} onClose={closeMemories} />
+      <AnimatePresence>{debugOpen && <DebugPanel key="debug" onClose={closeDebug} />}</AnimatePresence>
     </MotionConfig>
   );
 }
