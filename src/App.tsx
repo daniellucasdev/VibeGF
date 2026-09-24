@@ -11,8 +11,9 @@ import { DebugPanel } from "./components/DebugPanel";
 import { MemoriesDrawer } from "./components/MemoriesDrawer";
 import { Onboarding } from "./components/Onboarding";
 import { OpeningOverlay } from "./components/OpeningOverlay";
+import { SettingsModal } from "./components/SettingsModal";
 import { ToastLayer } from "./components/Toasts";
-import { isNightTime } from "./game/time";
+import { dayPeriod, isNightTime } from "./game/time";
 import { IdleWatcher } from "./hooks/IdleWatcher";
 import { useNow } from "./hooks/useNow";
 import { gameStore, useGame } from "./store/useGame";
@@ -32,13 +33,16 @@ export default function App() {
   const [debugOpen, setDebugOpen] = useState(debugFromUrl);
   const [memoriesOpen, setMemoriesOpen] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const sound = useGame((s) => s.settings.sound);
 
   // Tema automático: noite das 19h às 6h (8.1), com o relógio central.
   const theme = themeChoice === "auto" ? (isNightTime(clock) ? "night" : "day") : themeChoice;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-  }, [theme]);
+    document.documentElement.dataset.period = dayPeriod(clock);
+  }, [theme, clock]);
 
   // Abertura pela metade ou mensagens sem resposta: o motor resolve uma vez, na carga.
   useEffect(() => {
@@ -69,6 +73,9 @@ export default function App() {
   const closeDebug = useCallback(() => setDebugOpen(false), []);
   const closeConfession = useCallback(() => chatUiStore.setState({ confession: null }), []);
   const pokeIdle = useCallback(() => chatEngine.pokeIdle(), []);
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const toggleSound = useCallback(() => gameStore.getState().updateSettings({ sound: !gameStore.getState().settings.sound }), []);
 
   const lastMsg = messages[messages.length - 1];
   const lastIsHana = lastMsg?.role === "hana" && !confession;
@@ -80,6 +87,9 @@ export default function App() {
           theme={theme}
           onOpenMemories={openMemories}
           onOpenAlbum={openAlbum}
+          onOpenSettings={openSettings}
+          soundOn={sound}
+          onToggleSound={toggleSound}
           character={<CharacterPanel />}
           chat={<ChatWindow />}
         />
@@ -89,6 +99,7 @@ export default function App() {
       <OpeningOverlay />
       <MemoriesDrawer open={memoriesOpen} onClose={closeMemories} />
       <AlbumDrawer open={albumOpen} onClose={closeAlbum} />
+      <SettingsModal open={settingsOpen} onClose={closeSettings} />
       <ToastLayer />
       <ConfessionScene open={confession !== null} quote={confession?.quote ?? ""} onClose={closeConfession} />
       <IdleWatcher lastIsHana={lastIsHana} enabled={idleNudge && hasProfile} onIdle={pokeIdle} />

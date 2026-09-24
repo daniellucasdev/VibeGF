@@ -6,7 +6,10 @@ export default defineConfig(({ mode }) => {
   // Prefixo "" lê também o PORT do .env (só aqui no config, nada vai pro bundle).
   const env = loadEnv(mode, process.cwd(), "");
   const apiPort = env.PORT || "8787";
+  // GitHub Pages roda sob /VibeGF/; localmente a raiz é "/".
+  const base = process.env.GITHUB_PAGES === "true" ? "/VibeGF/" : "/";
   return {
+    base,
     plugins: [react(), tailwindcss()],
     build: {
       rollupOptions: {

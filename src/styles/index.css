@@ -194,6 +194,21 @@
   overflow: hidden;
   pointer-events: none;
   background: linear-gradient(160deg, var(--bg-a), var(--bg-b) 55%, var(--bg-c));
+  transition: background 900ms ease;
+}
+
+/* Fundo por período (8.1) — data-period no <html>; noite segue o tema */
+[data-period="morning"] .bg-scene {
+  background: linear-gradient(160deg, #FFE9D6 0%, #FFE3F1 45%, #DDF3FF 100%);
+}
+[data-period="afternoon"] .bg-scene {
+  background: linear-gradient(160deg, #DDF3FF 0%, #EDE4FF 50%, #FFE3F1 100%);
+}
+[data-period="sunset"] .bg-scene {
+  background: linear-gradient(160deg, #FFE0C2 0%, #FFC9D9 45%, #DCC8FF 100%);
+}
+[data-theme="night"] .bg-scene {
+  background: linear-gradient(160deg, #1F1A33 0%, #2A2147 55%, #13202E 100%);
 }
 
 .petal {
