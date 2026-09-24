@@ -13,7 +13,8 @@
   "dependencies": {
     "motion": "^12.23.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
