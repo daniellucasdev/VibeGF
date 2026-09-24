@@ -6,9 +6,15 @@ Kokoro ♡ (心, "coração") é um web app em React onde você conversa por cha
 
 1. Instale as dependências: `npm install`
 2. Copie o `.env.example` para `.env` e configure sua chave da Anthropic (console.anthropic.com)
-3. Rode `npm run dev` — front em http://localhost:5173, servidor em http://localhost:8787
+3. Rode `npm run dev` — front em http://localhost:5173, servidor em http://localhost:8787 (os dois sobem juntos com `concurrently`; o Vite faz proxy de `/api` para o servidor)
 
 > **Sem chave?** Coloque `MOCK_LLM=true` no `.env`: o app inteiro roda com respostas falsas, sem gastar nada. O deploy público (GitHub Pages) usa exatamente esse modo, então nenhum segredo vai para o bundle.
+
+## Modo mock (`MOCK_LLM=true`)
+
+O servidor devolve turnos falsos, mas válidos no mesmo schema do Claude: cerca de 20 falas por estágio, emoções variadas, deltas de +1 a +3 e eventos ocasionais. Ele também reage a declarações ("te amo", "gosto de você"), a pedidos de desculpa com uma briga em aberto e ao estado da declaração, para dar pra testar a UI inteira sem chave e sem custo. `MOCK_DELAY_MS` (padrão 600) simula a latência. `/api/summarize` no mock só acrescenta uma linha ao resumo anterior.
+
+Rotas: `POST /api/chat`, `POST /api/summarize` e `GET /api/health` (`{ ok, mock, model }`). O body é validado com Zod (mensagem do usuário até 500 caracteres, histórico até 40 itens) e há um rate limit de 20 requisições por minuto por IP.
 
 ## Implementação
 
@@ -29,7 +35,11 @@ Abra com `?debug=1` na URL ou `Ctrl+Shift+D`. Por enquanto o painel tem o "palco
 - **ASCII — ahoge:** cada trecho do ahoge é um `inline-block` que gira ±6° com `transform-origin` na base.
 - **Tema na fase 1:** o tema é automático pelo horário (noite das 19h às 6h). O seletor dia/noite está provisoriamente no DebugPanel, para conferir a galeria nos dois temas; o ajuste definitivo entra nos Ajustes (fase 7).
 - **Header:** os botões 📒 📸 ⚙️ 🔊 já aparecem, mas ficam marcados como "em breve" até as fases que os implementam.
-- **Proxy `/api`:** entra na fase 3, junto com o servidor.
+- **Servidor na fase 3:** só existe o mock. `MOCK_LLM` ausente vale `true`, e `MOCK_LLM=false` ainda cai no mock com um aviso no log, porque o Claude de verdade (`server/claude.ts`) entra na fase 5. O `.env` é lido com `process.loadEnvFile()` do Node (sem `dotenv`) e é opcional.
+- **Validação do request:** o limite de 500 caracteres vale para mensagens do usuário. Falas da Hana (até 3 balões de 400) e cenas aceitam até 1300. Também há limites para nome, memórias (60 × 200), resumo (2000), fuso (IANA válido) e datas (ISO).
+- **Rate limit:** janela fixa de 1 minuto em memória, sem dependência, aplicado a `/api/chat` e `/api/summarize` (o `/api/health` fica de fora). Responde 429 com `Retry-After`.
+- **App separado do `listen`:** `server/app.ts` monta o Express (`createApp`) e `server/index.ts` só lê o ambiente e sobe a porta, para os testes rodarem o app numa porta livre. `npm start` já serve o `dist/` com fallback para o `index.html`.
+- **`usage` no mock:** em desenvolvimento a resposta traz `usage` zerado e `mock: true`, para o painel de debug já ter onde mostrar.
 - **Listas fechadas em `shared/types.ts`:** `EMOTIONS`, `REACTIONS` e `EVENTS` ficam em `types.ts` (sem depender do Zod) e são reexportadas por `schema.ts`. Um teste garante que as 13 emoções batem com as expressões ASCII, e uma checagem de tipo garante que o Zod e o tipo `HanaTurn` não divergem.
 - **Fuso horário:** `shared/dailyLife.ts` tem `localParts(date, timeZone?)`. Sem fuso, usa o do navegador; com fuso (IANA), usa `Intl`. Assim o servidor calcula horário, rotina e data local com o `timeZone` do cliente.
 - **Anti-grind com várias mensagens:** o debounce junta várias mensagens num turno. O turno conta como repetição se **todas** repetem uma das últimas 10 (inclusive as anteriores do mesmo turno). "Curta" é o texto do turno inteiro com menos de 3 caracteres. Em `greet_return` e `idle_nudge` não há mensagem do usuário, então nenhum ganho positivo é aplicado.

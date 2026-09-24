@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { clampDeltas } from "./stages";
-import { EMOTIONS, EVENTS, REACTIONS, type HanaTurn } from "./types";
+import { CONFESSION_STATES, EMOTIONS, EVENTS, REACTIONS, type ChatRequest, type HanaTurn, type SummarizeRequest } from "./types";
 
 export { EMOTIONS, EVENTS, REACTIONS };
 
@@ -92,3 +92,71 @@ export function parseHanaTurn(text: string): HanaTurn | null {
   const parsed = HanaTurnSchema.safeParse(raw);
   return parsed.success ? sanitizeTurn(parsed.data) : null;
 }
+
+// ------------------------------------------------------------ requests (6.1)
+
+/** Limites de tamanho dos requests (6.1). */
+export const REQUEST_LIMITS = {
+  userMessageChars: 500,
+  /** Falas da Hana (até 3 balões de 400) e narração de cena. */
+  otherMessageChars: 1300,
+  historyItems: 40,
+  memories: 60,
+  memoryChars: 200,
+  summaryChars: 2000,
+  nameChars: 40,
+  summarizeItems: 400,
+} as const;
+
+const isoDate = z.string().max(40).refine((s) => !Number.isNaN(Date.parse(s)), "data inválida");
+const timeZone = z.string().max(64).refine((tz) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}, "fuso inválido");
+const feeling = z.number().min(0).max(100);
+
+export const HistoryItemSchema = z.discriminatedUnion("role", [
+  z.object({ role: z.literal("user"), text: z.string().max(REQUEST_LIMITS.userMessageChars), at: isoDate }),
+  z.object({ role: z.literal(["hana", "scene"]), text: z.string().max(REQUEST_LIMITS.otherMessageChars), at: isoDate }),
+]);
+
+export const ChatRequestSchema = z.object({
+  mode: z.enum(["reply", "greet_return", "idle_nudge"]),
+  profile: z.object({
+    name: z.string().trim().min(1).max(REQUEST_LIMITS.nameChars),
+    pronouns: z.enum(["ele", "ela", "elu"]),
+    honorific: z.enum(["kun", "chan", "none"]),
+    addressAs: z.string().max(REQUEST_LIMITS.nameChars + 10),
+  }),
+  relationship: z.object({
+    stage: z.literal([0, 1, 2, 3, 4, 5]),
+    affection: feeling,
+    trust: feeling,
+    romance: feeling,
+    daysTalked: z.number().int().min(0).max(100_000),
+    distant: z.boolean(),
+    pendingConflict: z.string().max(REQUEST_LIMITS.otherMessageChars).nullable(),
+    confession: z.enum(CONFESSION_STATES),
+    confessionNote: z.string().max(300),
+    togetherSince: isoDate.nullable(),
+  }),
+  mood: z.object({ emotion: z.enum(EMOTIONS), intensity: z.number().min(0).max(1) }),
+  memories: z.array(z.string().max(REQUEST_LIMITS.memoryChars)).max(REQUEST_LIMITS.memories),
+  summary: z.string().max(REQUEST_LIMITS.summaryChars),
+  history: z.array(HistoryItemSchema).max(REQUEST_LIMITS.historyItems),
+  client: z.object({ nowIso: isoDate, timeZone }),
+});
+
+export const SummarizeRequestSchema = z.object({
+  previousSummary: z.string().max(REQUEST_LIMITS.summaryChars),
+  messages: z.array(HistoryItemSchema).min(1).max(REQUEST_LIMITS.summarizeItems),
+});
+
+const _chatMatches: Same<z.infer<typeof ChatRequestSchema>, ChatRequest> = true;
+const _summarizeMatches: Same<z.infer<typeof SummarizeRequestSchema>, SummarizeRequest> = true;
+void _chatMatches;
+void _summarizeMatches;

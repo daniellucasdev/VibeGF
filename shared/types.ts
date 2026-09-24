@@ -69,3 +69,22 @@ export type ChatRequest = {
   history: HistoryItem[];
   client: { nowIso: string; timeZone: string };
 };
+
+/** Corpo de POST /api/summarize: resumo anterior + mensagens antigas. */
+export type SummarizeRequest = { previousSummary: string; messages: HistoryItem[] };
+
+/** Contagem de tokens (subconjunto do `usage` da API), para o painel de debug. */
+export type Usage = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+};
+
+/** Resposta de POST /api/chat. `usage` e `mock` só em desenvolvimento. */
+export type ChatResponse = HanaTurn & { usage?: Usage; mock?: boolean };
+
+export type SummarizeResponse = { summary: string };
+
+/** Corpo de erro de qualquer rota da API. */
+export type ApiError = { error: string };
