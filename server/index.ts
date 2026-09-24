@@ -14,13 +14,16 @@ try {
 
 const PORT = Number(process.env.PORT ?? 8787);
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
+const EFFORT = (process.env.HANA_EFFORT ?? "low") as "low" | "medium" | "high";
 const DEV = process.env.NODE_ENV !== "production";
 
-// Fase 3: o servidor só tem o mock. O Claude de verdade entra na fase 5, então
-// MOCK_LLM ausente vale `true` e MOCK_LLM=false ainda cai no mock, com aviso.
+// MOCK_LLM=true responde com falas falsas, sem chave e sem custo. Sem a
+// variável definida, o mock continua valendo (aviso no log).
 const wantsMock = (process.env.MOCK_LLM ?? "true").trim().toLowerCase() !== "false";
-if (!wantsMock) console.warn("[kokoro] MOCK_LLM=false, mas o Claude de verdade só entra na fase 5: usando o mock.");
-const MOCK = true;
+if (!wantsMock && !process.env.ANTHROPIC_API_KEY) {
+  console.warn("[kokoro] MOCK_LLM=false sem ANTHROPIC_API_KEY: o Claude real não vai funcionar até configurar o .env.");
+}
+const MOCK = wantsMock;
 
 const dist = resolve(import.meta.dirname, "../dist");
 
@@ -28,6 +31,10 @@ const app = createApp({
   mock: MOCK,
   dev: DEV,
   model: MODEL,
+  claude: {
+    model: MODEL,
+    effort: EFFORT,
+  },
   mockDelayMs: Number(process.env.MOCK_DELAY_MS ?? 600),
   staticDir: !DEV && existsSync(dist) ? dist : undefined,
 });

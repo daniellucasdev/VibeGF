@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildNowBlock (6.6) > tem o formato da seção 6.6 1`] = `
+"# AGORA
+- Momento: quarta-feira, 23/09, 18:02 (fim de tarde).
+- Última conversa: há 2 minutos.
+- Usuário: Dan (pronomes: ele). Chame de: "Dan-san".
+- Estágio 1: Conhecidos. Dias em que conversaram: 2.
+- Sentimentos: afeição 22/100 · confiança 15/100 · doki-doki 3/100.
+- Seu humor agora: neutra (0.3).
+- Relação: tudo bem.
+- Declaração: você ainda não está pronta para namorar.
+- Agora você provavelmente está: em casa, desenhando.
+- Hoje na sua vida: um cliente do café deu gorjeta em forma de origami.
+- Você lembra sobre o usuário:
+  - trabalha com programação
+  - tem um cachorro chamado Thor
+- Resumo do que já aconteceu: A Hana mandou mensagem pro número errado achando que era a Yui."
+`;
